@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+    backend:
+        image: nuxtflask/backend:${TAG}
+        sysctls:
+            net.core.somaxconn: 1024
+        restart: always
+        volumes:
+            - ./backend_run:/run
+        environment:
+            SCRIPT_NAME: $BASE_URI/api
+            WSGI_MODULE: backend:app
+            # 101: nginx gid
+            WSGI_SOCKET_GID: 101
+            TZ: Europe/Paris
+
+    frontend:
+        image: nuxtflask/frontend:${TAG}
+        restart: always
+        volumes:
+            - ./frontend_run:/run
+        environment:
+            BASE_URI:
+            # 101: nginx gid
+            SOCKET_GID: 101
+            TZ: Europe/Paris
+
+    proxy:
+        image: nginx
+        depends_on:
+            - backend
+            - frontend
+        restart: always
+        command: >
+            sh -c '
+                envsubst \$$BASE_URI < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf &&
+                exec /docker-entrypoint.sh nginx -g "daemon off;"
+            '
+        volumes:
+            - ./nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+            - ./proxy_run:/run
+            - ./backend_run:/backend_run
+            - ./frontend_run:/frontend_run
+        environment:
+            BASE_URI:
+            TZ: Europe/Paris
+
+# vim: se sw=4 sts=4 et:
